@@ -117,29 +117,39 @@
     };
   };
 
-  const inlineImages = el => Promise.all(
-    Array.from(el.querySelectorAll('image')).map(image => {
-      let href = image.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || image.getAttribute('href');
-      if (!href) return Promise.resolve(null);
-      if (isExternal(href)) {
-        href += (href.indexOf('?') === -1 ? '?' : '&') + 't=' + new Date().valueOf();
-      }
-      return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = href;
-        img.onerror = () => reject(new Error(`Could not load ${href}`));
-        img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', canvas.toDataURL('image/png'));
-          resolve(true);
-        };
-      });
-    })
-  );
+  const inlineImages = async (el, options) => {
+    const {
+      embedExternalImages
+    } = options || {};
+
+    if (embedExternalImages) {
+      return Promise.all(
+        Array.from(el.querySelectorAll('image')).map(image => {
+          let href = image.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || image.getAttribute('href');
+          if (!href) return Promise.resolve(null);
+          if (isExternal(href)) {
+            href += (href.indexOf('?') === -1 ? '?' : '&') + 't=' + new Date().valueOf();
+          }
+          return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = href;
+            img.onerror = () => reject(new Error(`Could not load ${href}`));
+            img.onload = () => {
+              canvas.width = img.width;
+              canvas.height = img.height;
+              canvas.getContext('2d').drawImage(img, 0, 0);
+              image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', canvas.toDataURL('image/png'));
+              resolve(true);
+            };
+          });
+        })
+      )
+    }
+
+    return el;
+  };
 
   const cachedFonts = {};
   const inlineFonts = fonts => Promise.all(
@@ -237,7 +247,7 @@
       excludeCss = false,
     } = options || {};
 
-    return inlineImages(el).then(() => {
+    return inlineImages(el, options).then(() => {
       let clone = el.cloneNode(true);
       clone.style.backgroundColor = (options || {}).backgroundColor || el.style.backgroundColor;
       const {width, height} = getDimensions(el, clone, w, h);
